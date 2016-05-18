@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+        <title></title>
+    </head>
+    <body>
+<script>
+    var letra = new RegExp(/^[a-zA-Z]/);
+    var identificador = new RegExp(/^[a-zA-Z0-9]/);
+    var digito = new RegExp(/^[0-9]/);
+    var opAritmeticos = new RegExp(/^(\+|-|\/|\*)/);
+    var opRelacionais = new RegExp(/^(>=|<=|==|!=|>|<)/);
+    var opLogicos = new RegExp(/^(&&|\|\|)/);
+    var reservCond = new RegExp(/^(while|for|if|else|do)/);
+    var reservInFim = new RegExp(/^(\{|\}|\(|\))/);
+    var caractEspeciais = new RegExp(/^(,|;|\.|\?|!|=)/);
+    var digito = new RegExp(/^[0-9]/);
+    var acDc = new RegExp(/^(\+\+|--|\+=|-=)/);
+    var comentario = new RegExp(/^(\/\*|\/\/)/);
+    var reservTipo = new RegExp(/^(int|float|char|double|string|void)/);
+
+
+    var initAnaliseLexica = function(codigo){
+        var result = Array();
+            result['coment'] = Array();
+            result['opArit'] = Array();
+            result['opRel'] = Array();
+            result['opLog'] = Array();
+            result['reservCond'] = Array();
+            result['reservInFim'] = Array();
+            result['reservTipo'] = Array();
+            result['identificador'] = Array();
+            result['digito'] = Array();
+            result['caractEspeciais'] = Array();
+            result['acDc'] = Array();
+            result['stringInFim'] = Array();   
+            result['naoReconhecido'] = Array();   
+        var tokens = Array();                
+        var cont =0;
+        var contLinha = 1;
+        while(cont < codigo.length){
+
+            var temp = '';
+            if(comentario.test(codigo[cont]+codigo[cont+1])){
+                if((codigo[cont]+codigo[cont+1]) == "//"){
+                    while(codigo[cont] != "\n"){
+                        temp += codigo[cont];
+                        cont++;
+                    }
+                    cont += 1;
+                    contLinha++;
+                }else if((codigo[cont]+codigo[cont+1]) == "/*"){
+                    while((codigo[cont]+codigo[cont+1]) != "*/"){
+                        if(codigo[cont] == "\n") contLinha++;
+                        temp += codigo[cont];
+                        cont++;
+                    }
+                    temp += codigo[cont]+codigo[cont+1];
+                    cont += 2;
+                }
+                tokens.push({value:temp,linha:contLinha});
+
+            }else if(letra.test(codigo[cont])){     
+               temp = '';
+               while(identificador.test(codigo[cont]) && codigo[cont] != undefined){   
+                   temp += codigo[cont];
+                   cont++;
+               }
+               tokens.push({value:temp,linha:contLinha});
+            }else if(digito.test(codigo[cont])){
+               temp = '';
+               while(digito.test(codigo[cont]) && codigo[cont] != undefined){   
+                   temp += codigo[cont];
+                   cont++;
+               }
+               tokens.push({value:temp,linha:contLinha});
+            }else if((codigo[cont] != "\n") && (codigo[cont] != " ")){
+                if((codigo[cont+1] == "\n") && (codigo[cont+1] == " ")){
+                    tokens.push({value:codigo[cont],linha:contLinha});
+
+                }else if((opRelacionais.test(codigo[cont])) && (codigo[cont+1] != "=")){
+                    tokens.push({value:codigo[cont],linha:contLinha});
+
+                }else if(opRelacionais.test(codigo[cont]+codigo[cont+1])){
+                    tokens.push({value:codigo[cont]+codigo[cont+1],linha:contLinha});
+                    cont++;
+
+                }else if(opLogicos.test(codigo[cont]+codigo[cont+1])){
+                    tokens.push({value:codigo[cont]+codigo[cont+1],linha:contLinha});
+                    cont++;
+
+                }else if(acDc.test(codigo[cont]+codigo[cont+1])){
+                    tokens.push({value:codigo[cont]+codigo[cont+1],linha:contLinha});
+                    cont++;
+
+                }else{
+                    tokens.push({value:codigo[cont],linha:contLinha});
+                }
+                cont++;
+            }else{
+                if(codigo[cont] == "\n") contLinha++;
+                cont++; 
+            }                  
+        }
+
+        for(var id in tokens){
+
+            if(comentario.test(tokens[id].value)){
+                result['coment'].push(tokens[id]);
+
+            }else if(acDc.test(tokens[id].value)){
+                result['acDc'].push(tokens[id]);
+
+            }else if(opAritmeticos.test(tokens[id].value)){
+                result['opArit'].push(tokens[id]);
+
+            }else if(opRelacionais.test(tokens[id].value)){
+                result['opRel'].push(tokens[id]);
+
+            }else if(opLogicos.test(tokens[id].value)){
+                result['opLog'].push(tokens[id]);
+
+            }else if(reservCond.test(tokens[id].value)){
+                result['reservCond'].push(tokens[id]);
+
+            }else if(reservInFim.test(tokens[id].value)){
+                result['reservInFim'].push(tokens[id]);
+
+            }else if(reservTipo.test(tokens[id].value)){
+                result['reservTipo'].push(tokens[id]);
+
+            }else if(digito.test(tokens[id].value)){
+                result['digito'].push(tokens[id]);
+
+            }else if(identificador.test(tokens[id].value)){
+                result['identificador'].push(tokens[id]);
+
+            }else if(caractEspeciais.test(tokens[id].value)){
+                result['caractEspeciais'].push(tokens[id]);
+
+            }else if(tokens[id].value == "\""){
+                result['stringInFim'].push(tokens[id]);
+            }else{
+                result['naoReconhecido'].push(tokens[id]); 
+            }
+        }
+        if(result['naoReconhecido'].length >0){
+            var html = '';
+            for(var i in result['naoReconhecido']){
+                html += 'Erro Lexico caracter "'
+                    +result['naoReconhecido'][i].value
+                    +'" não reconhecido. Linha: '
+                    +result['naoReconhecido'][i].linha+'\n';
+            }
+            document.getElementById('log').innerHTML = html;
+            return false;
+        }else{
+            return {result:result,token:tokens};
+        }
+    }
+
+
+
+    var imprimeErroSintatico = function(token){
+       var html = 'Erro Sintatico caracter '+token.value+' inesperado. Linha: '+token.linha+'\n';
+        document.getElementById('log').innerHTML = html;
+    }
+
+
+
+    var imprimeErroSemantico = function(token,variavel){
+        if(variavel)
+        var html = 'Erro Semantico variavel '+variavel.nome+' é do tipo '+variavel.tipo+'. Linha: '+token.linha+'\n';
+        else
+        var html = 'Erro Semantico variavel '+token.value+' não esta definida no escopo. Linha: '+token.linha+'\n';
+        document.getElementById('log').innerHTML = html;
+    }
+
+
+
+    var initAnaliseSintatica = function(codigo,resTok){
+        var tokens = resTok.token;
+        console.log(tokens);
+        var variaveis = Array();
+        var i = 0;
+        var inicio = false;
+        var contIf = 0;
+        var conchetes = 0;
+        while(i < tokens.length){
+            if(!comentario.test(tokens[i].value)){
+                if(!inicio){ //verificação caso ainda não tenha iniciado função main
+                    if(reservTipo.test(tokens[i].value)){
+                        i++;
+                        if(tokens[i].value == 'main'){
+                            i++;
+                            if(tokens[i].value == '('){
+                                i++;
+
+                                if(tokens[i].value == ')'){
+                                    i++;
+                                    if(tokens[i].value == '{'){
+                                        inicio = true;
+                                        conchetes++;
+                                        i++;
+                                    }else{
+                                        imprimeErroSintatico(tokens[i]);
+                                        return; 
+                                    }
+                                }else{
+                                    imprimeErroSintatico(tokens[i]);
+                                    return; 
+                                }
+                            }else{
+                                imprimeErroSintatico(tokens[i]);
+                                return; 
+                            }
+                        }else{
+                            imprimeErroSintatico(tokens[i]);
+                            return;
+                        }                                
+                    }else{
+                        imprimeErroSintatico(tokens[i]);
+                        return;
+
+                    }
+                }else if(tokens[i].value == 'while'){
+                        i++;
+                        if(tokens[i].value == '('){
+                           i++;
+                           var maisCond = false;
+                           do{
+                               if(tokens[i].value == '('){
+                                   i++;
+                                   var cond = verificaCondicao(tokens,i,variaveis);
+                                   if(cond) i = cond+1;
+                                    else return;
+                                   if(opLogicos.test(tokens[i].value)){
+                                       maisCond = true;
+                                       i++;
+                                   }else{ 
+                                       maisCond = false;
+                                       i++;
+                                   }                                           
+                               }else{
+                                   var cond = verificaCondicao(tokens,i,variaveis);
+                                   if(cond) i = cond+1;
+                                    else return;
+                               }
+                           }while(maisCond);
+                           if(tokens[i].value == '{'){
+                               conchetes++;
+                               i++;
+                           }
+
+                        }else{
+                            imprimeErroSintatico(tokens[i]);
+                            return
+                        }
+                    }else if(tokens[i].value == 'for'){
+                        i++;
+                        if(tokens[i].value == "("){
+                            i++;
+                            if(reservTipo.test(tokens[i].value)){
+                                i++;
+                                var id = variaveis.push({nome:tokens[i].value, tipo: tokens[i-1].value});
+                            }
+                            if(identificador.test(tokens[i].value)){
+                               if(verificaExisteVariavel(tokens[i].value,variaveis)){
+                                   i++;
+                                   if(tokens[i].value == '='){
+                                       i++;
+                                       if(digito.test(tokens[i].value) || identificador.test(tokens[i].value)){
+                                           if(!digito.test(tokens[i].value))
+                                           if(verificaExisteVariavel(tokens[i].value,variaveis) != 'int'){
+                                              imprimeErroSemantico(tokens[i],false);
+                                              return; 
+                                           }
+                                           i++;
+                                           if(tokens[i].value == ';'){
+                                                i++;
+                                                 if(identificador.test(tokens[i].value) || digito.test(tokens[i].value)){
+                                                     if(!digito.test(tokens[i].value))
+                                                     if(verificaExisteVariavel(tokens[i].value,variaveis) != 'int'){
+                                                        imprimeErroSemantico(tokens[i],false);
+                                                        return; 
+                                                     }
+                                                     i++;
+                                                     if(opRelacionais.test(tokens[i].value)){
+                                                         i++;
+                                                         if(identificador.test(tokens[i].value) || digito.test(tokens[i].value)){
+                                                             if(!digito.test(tokens[i].value))
+                                                             if(verificaExisteVariavel(tokens[i].value,variaveis) != 'int'){
+                                                                imprimeErroSemantico(tokens[i],false);
+                                                                return; 
+                                                             }
+                                                             i++;
+                                                             if(tokens[i].value == ';'){
+                                                                 i++;
+                                                                 if(identificador.test(tokens[i].value)){
+                                                                     if(verificaExisteVariavel(tokens[i].value,variaveis) != 'int'){
+                                                                        imprimeErroSemantico(tokens[i],false);
+                                                                        return; 
+                                                                     }
+                                                                     i++;
+                                                                     if(tokens[i].value == '++' || tokens[i].value == '--'){
+                                                                        i++;
+                                                                        if(tokens[i].value == ')'){
+                                                                            i++;
+                                                                            if(tokens[i].value == '{'){
+                                                                                conchetes++;
+                                                                                i++;
+                                                                            }
+                                                                        }else{
+                                                                            imprimeErroSintatico(tokens[i]);
+                                                                            return; 
+                                                                        }
+                                                                     }else{
+                                                                         imprimeErroSintatico(tokens[i]);
+                                                                         return; 
+                                                                     }
+                                                                 }else{
+                                                                    imprimeErroSintatico(tokens[i]);
+                                                                    return; 
+                                                                 }
+                                                             }else{
+                                                                 imprimeErroSintatico(tokens[i]);
+                                                                 return;
+                                                             }
+                                                         }else{
+                                                             imprimeErroSintatico(tokens[i]);
+                                                             return;
+                                                         }
+                                                     }else{
+                                                         imprimeErroSintatico(tokens[i]);
+                                                         return;
+                                                     }
+                                                 }else{
+                                                     imprimeErroSintatico(tokens[i]);
+                                                     return false;
+                                                 }
+                                            }else{
+                                                imprimeErroSintatico(tokens[i]);
+                                                return;  
+                                            }                              
+
+                                       }else{
+                                          imprimeErroSintatico(tokens[i]);
+                                          return;  
+                                       }
+                                   }else{
+                                      imprimeErroSintatico(tokens[i]);
+                                      return; 
+                                   }
+                               }else{
+                                   imprimeErroSemantico(tokens[i],false);
+                                   return; 
+                               }
+                            }else{
+                                imprimeErroSintatico(tokens[i]);
+                                return; 
+                            }
+                        }else{
+                            imprimeErroSintatico(tokens[i]);
+                            return
+                        }
+
+                    }else if(tokens[i].value == 'if'){
+                        i++;
+                        if(tokens[i].value == '('){
+                            var maisCond = false;
+                            i++;
+                            do{                                
+                                if(tokens[i].value == '('){
+                                    i++;
+                                    var cond = verificaCondicao(tokens,i,variaveis);
+                                    if(cond) i = cond+1;
+                                    else return;
+                                    if(opLogicos.test(tokens[i].value)){
+                                        maisCond = true;
+                                        i++;
+                                    }else{ 
+                                        maisCond = false;
+                                        i++;
+                                    }                                           
+                                }else{
+                                    var cond = verificaCondicao(tokens,i,variaveis);
+                                    if(cond) i = cond+1;
+                                    else return;
+                                }
+                            }while(maisCond);
+                            if(tokens[i].value == '{'){
+                                conchetes++;
+                                i++;
+                                contIf++;
+                            }
+                        }else{
+                            imprimeErroSintatico(tokens[i]);
+                            return; 
+                        }
+                    }else if(tokens[i].value == 'else'){
+                        if(contIf > 0){
+                            i++;
+                            if(tokens[i].value == '{'){
+                                conchetes++;
+                                i++;
+                                contIf--;
+                            }
+                        }else{
+                            imprimeErroSintatico(tokens[i]);
+                            return; 
+                        }
+                    }else if(reservTipo.test(tokens[i].value)){ //validação caso seja uma declaração de variavel
+                            i++;
+                            if(identificador.test(tokens[i].value)){
+                                var id = variaveis.push({nome:tokens[i].value, tipo: tokens[i-1].value})
+                                id--;
+                                i++;
+                                if(acDc.test(tokens[i].value) || tokens[i].value == "="){
+                                    i++;
+                                    if(variaveis[id].tipo == 'string' || variaveis[id].tipo == 'char' ){
+                                        if(tokens[i].value == '"' || identificador.test(tokens[i].value)){
+                                            i++;
+                                            while(tokens[i] != undefined){ // Se ouver mais operações na atribuição
+                                                if(tokens[i].value != '"')
+                                                    i++;
+                                                else
+                                                    break;                                                 
+                                            }
+                                            if(tokens[i] == undefined){
+                                                document.getElementById("log").innerHTML = 'Erro Sintatico fim do código inesperado. Esperado fim de string \'"\'';
+                                                return;
+                                            }else if(tokens[i].value == '"'){
+                                                i++;
+                                            }
+                                            if(tokens[i].value == ';'){
+                                                i++;
+                                            }else{
+                                                imprimeErroSintatico(tokens[i]);
+                                                return; 
+                                            }                                                
+                                        }else{
+                                            imprimeErroSemantico(tokens[i],variaveis[id]);
+                                            return; 
+                                        }                                                
+                                    }else if(variaveis[id].tipo == 'int' || variaveis[id].tipo == 'float' || variaveis[id].tipo == 'double'){
+                                        if(digito.test(tokens[i].value) || identificador.test(tokens[i].value)){
+                                            i++;
+                                            while(tokens[i].value != ';'){ // Se ouver mais operações na atribuição
+                                                if(opAritmeticos.test(tokens[i].value)){
+                                                    i++;
+                                                    if(digito.test(tokens[i].value) || identificador.test(tokens[i].value)){
+                                                        i++;
+                                                    }else{
+                                                        imprimeErroSintatico(tokens[i]);
+                                                        return; 
+                                                    }
+                                                }else{
+                                                    imprimeErroSintatico(tokens[i]);
+                                                    return; 
+                                                }
+                                            }
+                                            i++;
+                                        }else{
+                                            imprimeErroSemantico(tokens[i],variaveis[id]);
+                                            return; 
+                                        } 
+                                    }
+                                }else{
+                                    imprimeErroSintatico(tokens[i]);
+                                    return; 
+                                }
+                            }else{
+                                imprimeErroSintatico(tokens[i]);
+                                return;
+                            }
+                    }else if(identificador.test(tokens[i].value)){
+                        var tipo = verificaExisteVariavel(tokens[i].value,variaveis);
+                        if(tipo){
+                            i++;
+                            if(tokens[i].value == "=" || tokens[i].value == "+=" || tokens[i].value == "-="){
+                                i++;
+                                if(tipo == 'string' || tipo == 'char' ){
+                                    if(tokens[i].value == '"' || identificador.test(tokens[i].value)){
+                                        i++;
+                                        while(tokens[i] != undefined){ // Se ouver mais operações na atribuição
+                                            if(tokens[i].value != '"')
+                                                i++;
+                                            else
+                                                break;                                                 
+                                        }
+                                        if(tokens[i] == undefined){
+                                            document.getElementById("log").innerHTML = 'Erro Sintatico fim do código inesperado. Esperado fim de string \'"\'';
+                                            return;
+                                        }else if(tokens[i].value == '"'){
+                                            i++;
+                                        }
+                                        if(tokens[i].value == ';'){
+                                            i++;
+                                        }else{
+                                            imprimeErroSintatico(tokens[i]);
+                                            return; 
+                                        }                                              
+                                    }else{
+                                        if(digito.test(tokens[i].value)){
+                                            document.getElementById("log").innerHTML = 'Erro Semantico valor não corresponde à tipo da variavel. Linha: '+tokens[i].linha;
+                                        }else{
+                                            imprimeErroSemantico(tokens[i],variaveis[id]);
+                                        }
+                                        return;
+                                    }                                                
+                                }else if(tipo == 'int' || tipo == 'float' || tipo == 'double'){
+                                    
+                                    if(digito.test(tokens[i].value) || identificador.test(tokens[i].value)){
+                                        i++;
+                                        while(tokens[i].value != ';'){ // Se ouver mais operações na atribuição
+                                            if(opAritmeticos.test(tokens[i].value)){
+                                                i++;
+                                                if(digito.test(tokens[i].value) || identificador.test(tokens[i].value)){
+
+                                                    i++;
+                                                }else{
+                                                    imprimeErroSintatico(tokens[i]);
+                                                    return; 
+                                                }
+                                            }else{
+                                                imprimeErroSintatico(tokens[i]);
+                                                return; 
+                                            }
+                                        }
+                                        i++;
+                                    }else{
+                                        if(tokens[i].value == '"'){
+                                            document.getElementById("log").innerHTML = 'Erro Semantico valor não corresponde à tipo da variavel. Linha: '+tokens[i].linha;
+                                        }else{
+                                            imprimeErroSemantico(tokens[i],variaveis[id]);
+                                        }
+                                        return; 
+                                    } 
+                                }
+                            }else if(tokens[i].value == "++" || tokens[i].value == "--"){
+                                if(tipo == 'int' || tipo == 'float' || tipo == 'double'){
+                                    i++;
+                                    if(tokens[i].value == ';'){
+                                        i++;
+                                    }else{
+                                        imprimeErroSintatico(tokens[i]);
+                                        return;  
+                                    }
+                                }else{
+                                    imprimeErroSemantico(tokens[i],variaveis[id]);
+                                    return; 
+                                }
+                            }else{
+                                imprimeErroSintatico(tokens[i]);
+                                return; 
+                            }
+                        }else{
+                            imprimeErroSemantico(tokens[i],false);
+                            return; 
+                        }
+                                                
+                    }else if(tokens[i].value == "}"){
+                        conchetes--;
+                        i++;
+                    }
+                }else{
+                  i++;
+                }
+        }
+        if(conchetes == 0){
+            document.getElementById("log").innerHTML = 'Código compilado com sucesso!'
+        }else{
+            if(conchetes > 0)
+                document.getElementById("log").innerHTML = 'Erro Sintatico fim do código inesperado. Está faltando fechar conchetes';
+            else
+                document.getElementById("log").innerHTML = 'Erro Sintatico fim do código inesperado. Algum conchete está sobrando';
+            return; 
+        }
+
+    }
+    
+    var verificaExisteVariavel = function(value,variaveis){
+        for(var v in variaveis){
+            if(variaveis[v].nome == value)
+                return variaveis[v].tipo
+        }
+        return false
+    }
+    
+    var verificaCondicao = function(tokens,i,variaveis){
+        var tipo = false;
+        if(identificador.test(tokens[i].value)){
+            tipo = verificaExisteVariavel(tokens[i].value,variaveis)
+        }
+        if(tipo == 'int' || tipo == 'float' || tipo == 'double' || digito.test(tokens[i].value)){
+            i++;
+            tipo = false;
+            if(opRelacionais.test(tokens[i].value)){
+                i++;
+                if(identificador.test(tokens[i].value)){
+                    tipo = verificaExisteVariavel(tokens[i].value,variaveis)
+                }
+                if(tipo == 'int' || tipo == 'float' || tipo == 'double' || digito.test(tokens[i].value)){
+                    i++;
+                }else{
+                    document.getElementById("log").innerHTML = 'Erro Semantico variaveis da condiçao são de tipos diferentes. Linha: '+tokens[i].linha;
+                    return false;
+                }
+            }else{
+                imprimeErroSintatico(tokens[i]);
+                return false;
+            }
+        }else if(tipo == 'char' || tipo == 'string' || tokens[i].value == '"'){
+            if(tokens[i].value == '"'){
+                console.log(tokens[i])
+                i++;
+                while(tokens[i] != undefined){ // Se ouver mais operações na atribuição
+                    if(tokens[i].value != '"')
+                        i++;
+                    else
+                        break;                                                 
+                }
+                if(tokens[i] == undefined){
+                    console.log(tokens[i])
+                    document.getElementById("log").innerHTML = 'Erro Sintatico fim do código inesperado. Esperado fim de string \'"\'';
+                    return;
+                }else if(tokens[i].value == '"'){
+                    i++;
+                }
+            }else if(identificador.test(tokens[i].value)){
+                tipo = false;
+                i++;
+            }else{
+                imprimeErroSintatico(tokens[i]);
+                return false;
+            }
+            if(opRelacionais.test(tokens[i].value)){
+                i++;
+                if(tokens[i].value == '"'){
+                    i++;
+                    while(tokens[i] != undefined){ // Se ouver mais operações na atribuição
+                        if(tokens[i].value != '"')
+                            i++;
+                        else
+                            break;                                                 
+                    }
+                    if(tokens[i] == undefined){
+                        document.getElementById("log").innerHTML = 'Erro Sintatico fim do código inesperado. Esperado fim de string \'"\'';
+                        return false;
+                    }else if(tokens[i].value == '"'){
+                        i++;
+                    }
+                }else if(!digito.test(tokens[i].value)){
+                    if(identificador.test(tokens[i].value)){
+                        tipo = false;
+                        i++;
+                    }
+                }else{
+                    document.getElementById("log").innerHTML = 'Erro Sintatico fim do código inesperado. Esperado fim de string \'"\'';
+                    return false;
+                }
+            }else{
+                imprimeErroSintatico(tokens[i]);
+                return false;
+            }   
+        }     
+        if(tokens[i].value == ')'){
+            return i;
+        }else{
+            imprimeErroSintatico(tokens[i]);
+            return false;
+        }
+    }
+
+    var compila = function(){
+
+        var codigo = document.getElementById('codigo').value;
+        var resTok = initAnaliseLexica(codigo);
+        if(resTok){
+            initAnaliseSintatica(codigo,resTok);
+        }
+
+    }
+
+</script>
+<textarea id="codigo" cols="70" rows="20">
+/* Este é um exemplo de codigo reconhecido
+   pelo analisador criado  */
+
+int main(){
+    int a1 = 1+1;
+    string alo = "lol";
+    for(int i=0;i<10;i++){
+        a1++;
+    }
+    while((a1 < 1)||(a1 > 3)){
+        if((a1>1)||(a1 != 3)&&(a1==2)){
+            a1++;
+            alo = "1";
+            if(alo == "lol"){
+              a1++;
+            }
+            // Exemplo de comentário de linha
+        }else{
+            a1-=2;
+        
+        }
+    }
+}
+</textarea>
+        <button  onclick="compila();">Compilar</button>
+        <textarea id="log" readonly cols="70" rows="20">
+        </textarea>
+    </body>
+</html>
